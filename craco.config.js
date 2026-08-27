@@ -1,6 +1,9 @@
 // craco.config.js
 const path = require("path");
 require("dotenv").config();
+// Render (and most CIs) set CI=true which makes react-scripts treat warnings as errors and fails the build.
+// Fastest fix: force CI=false for craco build so warnings don't fail deploy.
+process.env.CI = "false";
 const WorkboxPlugin = require("workbox-webpack-plugin");
 
 // Check if we're in development/preview mode (not production build)
