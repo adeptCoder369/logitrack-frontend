@@ -7,12 +7,12 @@ services:
     # - .npmrc sets legacy-peer-deps=true (fixes React 19 peer conflict)
     # - package.json moves craco/workbox/tailwind to dependencies (fixes craco not found when NODE_ENV=production skips devDeps)
     # - craco.config.js forces CI=false (fixes warnings-as-errors)
-    # - engines + .nvmrc pin Node 20 but allow >=20 for Render default 24
+    # - engines + .nvmrc pin Node 24 (Vercel requires 24.x after 2026-10-01, Render default is 24.14.1)
     buildCommand: CI=false npm run build
     staticPublishPath: build
     envVars:
       - key: NODE_VERSION
-        value: 20.19.0
+        value: 24.14.1
       - key: CI
         value: false
       - key: NPM_CONFIG_PRODUCTION
