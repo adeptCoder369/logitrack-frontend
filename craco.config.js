@@ -1,9 +1,12 @@
 // craco.config.js
 const path = require("path");
 require("dotenv").config();
-// Render (and most CIs) set CI=true which makes react-scripts treat warnings as errors and fails the build.
-// Fastest fix: force CI=false for craco build so warnings don't fail deploy.
+// Long-term fix for CI builds (Render, Vercel, etc.):
+// react-scripts treats any ESLint warning as error when CI=true, breaking deploy on harmless
+// exhaustive-deps warnings. We force CI=false for build and disable ESLint fail-on-error.
+// See: https://create-react-app.dev/docs/advanced-configuration
 process.env.CI = "false";
+process.env.DISABLE_ESLINT_PLUGIN = process.env.DISABLE_ESLINT_PLUGIN || "false";
 const WorkboxPlugin = require("workbox-webpack-plugin");
 
 // Check if we're in development/preview mode (not production build)
@@ -38,6 +41,9 @@ if (config.enableHealthCheck) {
 
 const webpackConfig = {
   eslint: {
+    // Long-term: warnings should not fail production build on Render.
+    // Keep rules but don't let CI turn warn->error. Craco + react-scripts respects CI=false above.
+    enable: true,
     configure: {
       extends: ["plugin:react-hooks/recommended"],
       rules: {
