@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: logitrack-frontend
+    env: static
+    plan: free
+    buildCommand: npm install --legacy-peer-deps --include=dev && CI=false npm run build
+    staticPublishPath: build
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.0
+      - key: CI
+        value: false
+      - key: NPM_CONFIG_PRODUCTION
+        value: false
