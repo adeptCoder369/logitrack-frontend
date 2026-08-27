@@ -8,24 +8,17 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Popover, PopoverTrigger, PopoverContent } from '../components/ui/popover';
+import { Checkbox } from '../components/ui/checkbox';
+import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { transportersApi, importApi } from '../lib/api';
+import { transportersApi, importApi, companiesApi, trucksApi, pickupApi } from '../lib/api';
 import { toast } from 'sonner';
-import { Plus, Upload, Download, Users, X, Edit, Trash2, User, Phone, Mail, MapPin } from 'lucide-react';
+import { Plus, Upload, Download, Users, X, Edit, Trash2, User, Phone, Mail, MapPin, ChevronDown, ChevronUp, Truck, Package } from 'lucide-react';
 import { Can } from '../components/Can';
 import { usePermissions } from '../lib/permissions';
 
 const columns = [
-  { key: 'name', label: 'Transporter Name', render: (v, row) => (
-    <div className="flex items-center gap-2">
-      <span className="font-medium">{v}</span>
-      {row.users?.length > 0 && (
-        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-          {row.users.length} users
-        </span>
-      )}
-    </div>
-  )},
   { key: 'trade_name', label: 'Trade Name' },
   { key: 'contact_person_name', label: 'Contact Person' },
   { key: 'mobile_number', label: 'Mobile' },
@@ -49,23 +42,51 @@ export default function Transporters() {
   const canDeleteTransporterUsers = hasPermission('Transporter Users (Delete)');
   const canCreateTransporter = hasPermission('Transporters (Create)');
   const [transporters, setTransporters] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [trucks, setTrucks] = useState([]);
+  const [pickups, setPickups] = useState([]);
+  const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const tableColumns = [
+    {
+      key: 'name', label: 'Transporter Name', render: (v, row) => {
+        const userCount = row.user_count ?? row.users?.length ?? 0;
+        const truckCount = trucks.filter(t => t.transporter_id === row.id).length;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{v}</span>
+            {userCount > 0 && (
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                {userCount} users
+              </span>
+            )}
+            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full border flex items-center gap-1.5">
+              <Truck className="w-3.5 h-3.5" /> {truckCount}
+            </span>
+          </div>
+        )
+      }
+    },
+    ...columns
+  ];
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
-  
+console.log(transporters)
   // Transporter Users state
   const [usersModalOpen, setUsersModalOpen] = useState(false);
   const [userFormOpen, setUserFormOpen] = useState(false);
   const [userDeleteOpen, setUserDeleteOpen] = useState(false);
   const [selectedTransporter, setSelectedTransporter] = useState(null);
   const [transporterUsers, setTransporterUsers] = useState([]);
+  const [systemUsers, setSystemUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     trade_name: '',
@@ -76,6 +97,7 @@ export default function Transporters() {
     gst_number: '',
     pan_number: '',
     industry_type: '',
+    company_ids: [],
     website: '',
   });
 
@@ -100,14 +122,23 @@ export default function Transporters() {
     remarks: '',
   });
 
-  useEffect(() => {
+  useEffect(() => { 
     fetchTransporters();
   }, []);
 
   const fetchTransporters = async () => {
     try {
-      const res = await transportersApi.getAll();
-      setTransporters(res.data);
+      const [transportersRes, companiesRes, trucksRes, pickupsRes] = await Promise.all([
+        transportersApi.getAll(),
+        companiesApi.getAll(),
+        trucksApi.getAll(),
+        pickupApi.getAll({ page_size: 500 })
+      ]);
+      console.log(transportersRes.data);
+      setTransporters(transportersRes.data);
+      setCompanies(companiesRes.data || []);
+      setTrucks(trucksRes.data || []);
+      setPickups(pickupsRes.data || []);
     } catch (error) {
       toast.error('Failed to load transporters');
     } finally {
@@ -118,11 +149,16 @@ export default function Transporters() {
   const fetchTransporterUsers = async (transporterId) => {
     setLoadingUsers(true);
     try {
-      const res = await transportersApi.getUsers(transporterId);
-      setTransporterUsers(res.data);
+      const [usersRes, systemUsersRes] = await Promise.all([
+        transportersApi.getUsers(transporterId),
+        transportersApi.getSystemUsers(transporterId)
+      ]);
+      setTransporterUsers(usersRes.data);
+      setSystemUsers(systemUsersRes.data || []);
     } catch (error) {
       toast.error('Failed to load transporter users');
       setTransporterUsers([]);
+      setSystemUsers([]);
     } finally {
       setLoadingUsers(false);
     }
@@ -140,6 +176,7 @@ export default function Transporters() {
       gst_number: '',
       pan_number: '',
       industry_type: '',
+      company_ids: [],
       website: '',
     });
     setModalOpen(true);
@@ -157,6 +194,7 @@ export default function Transporters() {
       gst_number: item.gst_number || '',
       pan_number: item.pan_number || '',
       industry_type: item.industry_type || '',
+      company_ids: item.company_ids || [],
       website: item.website || '',
     });
     setModalOpen(true);
@@ -240,6 +278,11 @@ export default function Transporters() {
       toast.error('User name is required');
       return;
     }
+    const numericMobile = userFormData.mobile_number?.replace(/\D/g, '');
+    if (!numericMobile || numericMobile.length !== 10) {
+      toast.error('Mobile number is required and must be 10 digits');
+      return;
+    }
     setSaving(true);
     try {
       if (selectedUser) {
@@ -252,9 +295,9 @@ export default function Transporters() {
       setUserFormOpen(false);
       fetchTransporterUsers(selectedTransporter.id);
       fetchTransporters();
-    } catch (error) {
-      toast.error('Failed to save user');
-    } finally {
+} catch (error) {
+       toast.error(error.response?.data?.detail || 'Failed to save user');
+     } finally {
       setSaving(false);
     }
   };
@@ -325,17 +368,17 @@ export default function Transporters() {
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setImporting(true);
     try {
       const response = await importApi.bulkImport('transporters', file);
       const { imported, errors, total_errors } = response.data;
-      
+
       if (imported > 0) {
         toast.success(`Successfully imported ${imported} transporters`);
         fetchTransporters();
       }
-      
+
       if (total_errors > 0) {
         toast.error(`${total_errors} rows had errors`);
         errors.forEach(err => console.error(err));
@@ -350,21 +393,34 @@ export default function Transporters() {
 
   const industryOptions = ['Cement', 'Iron and Steel', 'FMCG', 'Construction', 'Agriculture', 'Chemicals', 'Other'];
 
-  // Custom actions for DataTable with Manage Users button
-  const customActions = (item) => (
-    <div className="flex items-center gap-1">
-      {canViewTransporterUsers && (
+  // Custom actions for DataTable with Manage Users + Expand Trucks
+  const customActions = (item) => {
+    const isExpanded = expandedId === item.id;
+    const truckCount = trucks.filter(t => t.transporter_id === item.id).length;
+    return (
+      <div className="flex items-center gap-1">
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => handleManageUsers(item)}
-          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          onClick={() => setExpandedId(isExpanded ? null : item.id)}
+          className={`${isExpanded ? 'bg-slate-100' : ''} hover:bg-slate-100`}
+          title={`${truckCount} trucks — ${isExpanded ? 'Collapse' : 'Expand'}`}
         >
-          <Users className="w-4 h-4" />
+          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </Button>
-      )}
-    </div>
-  );
+        {canViewTransporterUsers && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleManageUsers(item)}
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          >
+            <Users className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <PageLayout
@@ -397,7 +453,7 @@ export default function Transporters() {
       }
     >
       <DataTable
-        columns={columns}
+        columns={tableColumns}
         data={transporters}
         loading={loading}
         onEdit={hasActionPermission('update_transporter') ? handleEdit : undefined}
@@ -405,6 +461,94 @@ export default function Transporters() {
         customActions={customActions}
         emptyMessage="No transporters found. Add your first transporter!"
       />
+
+      {/* Trucks accordion — per transporter */}
+      {expandedId && (() => {
+        const transporter = transporters.find(t => t.id === expandedId);
+        const tTrucks = trucks.filter(t => t.transporter_id === expandedId);
+        const getDisplayStatus = (truck) => {
+          const related = pickups.filter(p => p.truck_number === truck.vehicle_number);
+          if (related.length) {
+            const active = related.filter(p => !['rescheduled','rejected'].includes((p.status||'').toLowerCase()));
+            const pool = active.length ? active : related;
+            pool.sort((a,b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at));
+            const s = pool[0]?.status;
+            if (s) return s;
+          }
+          return truck.current_status || 'Idle';
+        };
+        const grouped = tTrucks.reduce((acc, truck) => {
+          const s = getDisplayStatus(truck);
+          (acc[s] = acc[s] || []).push(truck);
+          return acc;
+        }, {});
+        const statusOrder = ['Idle', 'Scheduled', 'loading_started', 'Loaded', 'loading done', 'verified'];
+        const sortedStatuses = Object.keys(grouped).sort((a,b) => {
+          const ia = statusOrder.indexOf(a); const ib = statusOrder.indexOf(b);
+          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+        const statusColor = (s) => {
+          if (s === 'Idle') return 'bg-slate-100 text-slate-700 border-slate-200';
+          if (s.toLowerCase().includes('loaded')) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+          if (s.toLowerCase().includes('loading')) return 'bg-amber-50 text-amber-700 border-amber-200';
+          if (s.toLowerCase().includes('scheduled')) return 'bg-blue-50 text-blue-700 border-blue-200';
+          if (s.toLowerCase().includes('verified')) return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+          return 'bg-gray-50 text-gray-700 border-gray-200';
+        };
+        return (
+          <Card className="mt-4 border-2 border-slate-200 shadow-sm">
+            <CardHeader className="bg-slate-50 border-b flex flex-row items-center justify-between py-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Truck className="w-4 h-4 text-slate-600" />
+                {transporter?.name} — Trucks ({tTrucks.length})
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setExpandedId(null)}>
+                <X className="w-4 h-4 mr-1" /> Close
+              </Button>
+            </CardHeader>
+            <CardContent className="p-4">
+              {tTrucks.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <Package className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm">No trucks assigned to this transporter</p>
+                  <p className="text-xs text-slate-400">Trucks will appear here once created with this transporter</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {sortedStatuses.map(status => (
+                    <div key={status} className="border rounded-lg overflow-hidden">
+                      <div className="bg-slate-50 px-4 py-2.5 flex items-center justify-between border-b">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${statusColor(status)}`}>
+                          {status}
+                        </span>
+                        <span className="text-xs bg-white border px-2.5 py-1 rounded-full font-bold">{grouped[status].length}</span>
+                      </div>
+                      <div className="divide-y">
+                        {grouped[status].map(truck => {
+                          const dispStatus = getDisplayStatus(truck);
+                          return (
+                            <div key={truck.id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50">
+                              <div>
+                                <p className="font-mono text-sm font-semibold">{truck.vehicle_number}</p>
+                                <p className="text-xs text-slate-500 flex items-center gap-2">
+                                  {truck.driver_name || '—'} • {truck.capacity_mt ? `${truck.capacity_mt} MT` : '—'} {truck.transporter_name ? `• ${truck.transporter_name}` : ''}
+                                </p>
+                              </div>
+                              <span className={`text-xs px-2 py-1 rounded-full border font-medium ${statusColor(dispStatus)}`}>
+                                {dispStatus}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <FormModal
         open={modalOpen}
@@ -487,6 +631,62 @@ export default function Transporters() {
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label>Mapped Companies</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between h-auto min-h-9"
+                  type="button"
+                >
+                  <div className="flex flex-wrap gap-1 items-center">
+                    {formData.company_ids?.length > 0 ? (
+                      formData.company_ids.map((id) => {
+                        const company = companies.find(c => c.id === id);
+                        return (
+                          <Badge key={id} variant="secondary" className="mr-1">
+                            {company?.name || id}
+                          </Badge>
+                        );
+                      })
+                    ) : (
+                      <span className="text-muted-foreground">Select companies</span>
+                    )}
+                  </div>
+                  <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <div className="max-h-60 overflow-y-auto p-2">
+                  {companies.map((company) => (
+                    <div
+                      key={company.id}
+                      className="flex items-center space-x-2 p-2 hover:bg-slate-100 rounded cursor-pointer"
+                      onClick={() => {
+                        const newIds = formData.company_ids?.includes(company.id)
+                          ? formData.company_ids.filter(id => id !== company.id)
+                          : [...(formData.company_ids || []), company.id];
+                        setFormData({ ...formData, company_ids: newIds });
+                      }}
+                    >
+                      <Checkbox
+                        checked={formData.company_ids?.includes(company.id) || false}
+                        onCheckedChange={() => {
+                          const newIds = formData.company_ids?.includes(company.id)
+                            ? formData.company_ids.filter(id => id !== company.id)
+                            : [...(formData.company_ids || []), company.id];
+                          setFormData({ ...formData, company_ids: newIds });
+                        }}
+                      />
+                      <label className="text-sm cursor-pointer flex-1">{company.name}</label>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
           <div className="col-span-2">
             <Label htmlFor="address">Address</Label>
             <Textarea
@@ -536,63 +736,58 @@ export default function Transporters() {
             <CardContent className="p-4 overflow-y-auto max-h-[calc(90vh-100px)]">
               {loadingUsers ? (
                 <div className="text-center py-8 text-gray-500">Loading users...</div>
-              ) : transporterUsers.length === 0 ? (
+              ) : transporterUsers.length === 0 && systemUsers.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                   <p>No users added yet</p>
                   <p className="text-sm">Click "Add User" to add users to this transporter</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {transporterUsers.map((user) => (
-                    <Card key={user.id} className="border hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                              <User className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <p className="font-medium">{user.name}</p>
-                              {user.title && <p className="text-sm text-gray-500">{user.title}</p>}
-                            </div>
-                          </div>
-                          <div className="flex gap-1">
-                            {canUpdateTransporterUsers && (
-                              <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
-                                <Edit className="w-4 h-4 text-gray-500" />
-                              </Button>
-                            )}
-                            {canDeleteTransporterUsers && (
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(user)}>
-                                <Trash2 className="w-4 h-4 text-red-500" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="mt-3 space-y-1 text-sm">
-                          {user.mobile_number && (
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <Phone className="w-3 h-3" />
-                              {user.mobile_number}
-                            </div>
-                          )}
-                          {user.email && (
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <Mail className="w-3 h-3" />
-                              {user.email}
-                            </div>
-                          )}
-                          {(user.city || user.state) && (
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <MapPin className="w-3 h-3" />
-                              {[user.city, user.state].filter(Boolean).join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                <div className="space-y-6">
+                  {/* System Users Section */}
+                  {systemUsers?.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        System Users ({systemUsers.length})
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {systemUsers.map((user) => (
+                          <Card key={user.id} className="border border-blue-100 hover:shadow-md transition-shadow bg-blue-50">
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-3 flex-1">
+                                  <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center">
+                                    <User className="w-5 h-5 text-blue-700" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-gray-900">{user.name}</p>
+                                    <p className="text-xs text-gray-500">System User</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-3 space-y-1 text-sm">
+                                {user.mobile && (
+                                  <div className="flex items-center gap-2 text-gray-600">
+                                    <Phone className="w-3 h-3" />
+                                    {user.mobile}
+                                  </div>
+                                )}
+                                {user.email && (
+                                  <div className="flex items-center gap-2 text-gray-600">
+                                    <Mail className="w-3 h-3" />
+                                    {user.email}
+                                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  
                 </div>
               )}
             </CardContent>
@@ -630,8 +825,8 @@ export default function Transporters() {
             <Label>Mobile Number</Label>
             <Input
               value={userFormData.mobile_number}
-              onChange={(e) => setUserFormData({ ...userFormData, mobile_number: e.target.value })}
-              placeholder="+91 XXXXXXXXXX"
+              onChange={(e) => setUserFormData({ ...userFormData, mobile_number: e.target.value.replace(/\D/g, '') })}
+              placeholder="10-digit mobile number"
             />
           </div>
           <div>

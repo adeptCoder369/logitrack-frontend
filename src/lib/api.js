@@ -1,9 +1,13 @@
 import axios from 'axios';
 import { enqueueOfflineRequest, isMutation, isOnline } from './offline';
+import { toast } from 'sonner';
+// ================================================================================================================
+export const BACKEND_URL = (
+  process.env.REACT_APP_BACKEND_URL
+).replace(/\/api$/, '/api/v1');
 
-// export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://logitrack-backend-00mt.onrender.com';
-export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ;
-const API_BASE = `${BACKEND_URL}/api`;
+const API_BASE = `${BACKEND_URL}/api/v1`;
+const DOWNLOAD_TOKEN_KEY = 'download_token';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -53,16 +57,46 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem(DOWNLOAD_TOKEN_KEY);
       window.location.href = '/login';
+    }
+    if (error.response?.status === 402) {
+      toast.error(error.response?.data?.detail || 'Subscription past due — writes blocked');
+    }
+    if (error.response?.status === 403 && error.response?.data?.detail?.includes('suspended')) {
+      toast.error('Workspace suspended — contact Platform admin');
     }
     return Promise.reject(error);
   }
 );
 
+// ---- Download token -------------------------------------------------------
+// The browser loads file and export URLs itself (<img src>, window.open) and
+// cannot attach an Authorization header, so those URLs carry a short-lived,
+// download-scoped token as ?t=. It is stored so the URL builders below can stay
+// synchronous; refreshDownloadToken() is called on login and on a timer.
+export const refreshDownloadToken = async () => {
+  if (!localStorage.getItem('token')) return null;
+  try {
+    const { data } = await api.post('/auth/download-token');
+    localStorage.setItem(DOWNLOAD_TOKEN_KEY, data.token);
+    return data.token;
+  } catch (e) {
+    return null;
+  }
+};
+
+export const clearDownloadToken = () => localStorage.removeItem(DOWNLOAD_TOKEN_KEY);
+
+const withDownloadToken = (url) => {
+  const t = localStorage.getItem(DOWNLOAD_TOKEN_KEY);
+  if (!t) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}t=${encodeURIComponent(t)}`;
+};
+
 // Auth
 export const authApi = {
   login: (data) => api.post('/auth/login', data),
-  register: (data) => api.post('/auth/register', data),
   getMe: () => api.get('/auth/me'),
   // OTP endpoints
   sendOtp: (data) => api.post('/otp/send', data),
@@ -98,9 +132,22 @@ export const companiesApi = {
   updateUser: (companyId, userId, data) => api.put(`/companies/${companyId}/users/${userId}`, data),
   deleteUser: (companyId, userId) => api.delete(`/companies/${companyId}/users/${userId}`),
 
-// Purchase Orders
+  // Purchase Orders
   getPurchaseOrders: (companyId) => api.get(`/companies/${companyId}/purchase-orders`),
 
+  // Offices & Factories (Phase 2)
+  getOffices: (companyId) => api.get(`/companies/${companyId}/offices`),
+  addOffice: (companyId, data) => api.post(`/companies/${companyId}/offices`, data),
+  updateOffice: (companyId, officeId, data) => api.put(`/companies/${companyId}/offices/${officeId}`, data),
+  deleteOffice: (companyId, officeId) => api.delete(`/companies/${companyId}/offices/${officeId}`),
+  getFactories: (companyId) => api.get(`/companies/${companyId}/factories`),
+  addFactory: (companyId, data) => api.post(`/companies/${companyId}/factories`, data),
+  updateFactory: (companyId, factoryId, data) => api.put(`/companies/${companyId}/factories/${factoryId}`, data),
+  deleteFactory: (companyId, factoryId) => api.delete(`/companies/${companyId}/factories/${factoryId}`),
+
+  // Client modules (Phase 2)
+  getModules: (companyId) => api.get(`/companies/${companyId}/modules`),
+  updateModules: (companyId, modules) => api.put(`/companies/${companyId}/modules`, { modules }),
 };
 
 // Transporters
@@ -112,6 +159,7 @@ export const transportersApi = {
   delete: (id) => api.delete(`/transporters/${id}`),
   // User management
   getUsers: (transporterId) => api.get(`/transporters/${transporterId}/users`),
+  getSystemUsers: (transporterId) => api.get(`/transporters/${transporterId}/system-users`),
   addUser: (transporterId, userData) => api.post(`/transporters/${transporterId}/users`, userData),
   updateUser: (transporterId, userId, userData) => api.put(`/transporters/${transporterId}/users/${userId}`, userData),
   deleteUser: (transporterId, userId) => api.delete(`/transporters/${transporterId}/users/${userId}`),
@@ -126,6 +174,8 @@ export const trucksApi = {
   delete: (id) => api.delete(`/trucks/${id}`),
   addDriver: (truckId, driver) => api.post(`/trucks/${truckId}/drivers`, driver),
   removeDriver: (truckId, driverMobile) => api.delete(`/trucks/${truckId}/drivers/${driverMobile}`),
+  downloadDocuments: (truckId) => withDownloadToken(`${API_BASE}/trucks/${truckId}/download-documents`),
+  downloadDocumentsChecklist: (truckId) => withDownloadToken(`${API_BASE}/trucks/${truckId}/download-documents-checklist`),
 };
 
 // Railway Sidings
@@ -168,15 +218,25 @@ export const depotsApi = {
 export const depotInventoryApi = {
   getAll: () => api.get('/depot-inventory'),
   getByDepot: (depotId) => api.get(`/depot-inventory/${depotId}`),
-  getLedger: (depotId, productId, dateFrom, dateTo) => 
-    api.get(`/depot-inventory/ledger/${depotId}/${productId}`, { 
-      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined } 
+  getLedger: (depotId, productId, dateFrom, dateTo) =>
+    api.get(`/depot-inventory/ledger/${depotId}/${productId}`, {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined }
+    }),
+};
+
+// Company Inventory
+export const companyInventoryApi = {
+  getAll: () => api.get('/company-inventory'),
+  getByCompany: (companyId) => api.get(`/company-inventory/${companyId}`),
+  getLedger: (companyId, productId, dateFrom, dateTo) =>
+    api.get(`/company-inventory/ledger/${companyId}/${productId}`, {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined }
     }),
 };
 
 // Delivery Orders
 export const deliveryOrdersApi = {
-  getAll: (status) => api.get('/delivery-orders', { params: { status } }),
+  getAll: (status, tenantId) => api.get('/delivery-orders', { params: { status, tenant_id: tenantId || undefined } }),
   getOne: (id) => api.get(`/delivery-orders/${id}`),
   create: (data) => api.post('/delivery-orders', data),
   update: (id, data) => api.put(`/delivery-orders/${id}`, data),
@@ -196,15 +256,15 @@ export const liftingsApi = {
 
 // Export
 export const exportApi = {
-  liftings: (params) => `${API_BASE}/export/liftings?format=excel&${new URLSearchParams(params).toString()}`,
-  inventory: () => `${API_BASE}/export/inventory?format=excel`,
-  deliveryOrders: (status) => `${API_BASE}/export/delivery-orders?format=excel${status ? `&status=${status}` : ''}`,
-  users: () => `${API_BASE}/export/users?format=excel`,
+  liftings: (params) => withDownloadToken(`${API_BASE}/export/liftings?format=excel&${new URLSearchParams(params).toString()}`),
+  inventory: () => withDownloadToken(`${API_BASE}/export/inventory?format=excel`),
+  deliveryOrders: (status) => withDownloadToken(`${API_BASE}/export/delivery-orders?format=excel${status ? `&status=${status}` : ''}`),
+  users: () => withDownloadToken(`${API_BASE}/export/users?format=excel`),
 };
 
 // Import
 export const importApi = {
-  getTemplate: (entity) => `${API_BASE}/import/template/${entity}`,
+  getTemplate: (entity) => withDownloadToken(`${API_BASE}/import/template/${entity}`),
   bulkImport: (entity, file) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -212,6 +272,12 @@ export const importApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   }
+};
+
+// Downloads / Gatepass
+export const downloadsApi = {
+  getDriverGatepass: (truckId) => withDownloadToken(`${API_BASE}/trucks/${truckId}/download-driver-gatepass`),
+  getHelperGatepass: (truckId) => withDownloadToken(`${API_BASE}/trucks/${truckId}/download-helper-gatepass`),
 };
 
 // Users
@@ -229,13 +295,21 @@ export const permissionsApi = {
   reset: () => api.post('/permissions/reset'),
 };
 
+// Tenants (Phase 0)
+export const tenantApi = {
+  getConfig: () => api.get('/tenant/config'),
+  getAll: () => api.get('/tenants'),
+  create: (data) => api.post('/tenants', data),
+  update: (id, data) => api.put(`/tenants/${id}`, data),
+};
+
 // Product Access
 export const productAccessApi = {
   getAll: () => api.get('/product-access'),
   getUserAccess: (userId) => api.get(`/product-access/user/${userId}`),
-  updateUserAccess: (userId, assignedProducts) => api.put(`/product-access/user/${userId}`, { 
-    user_id: userId, 
-    assigned_products: assignedProducts 
+  updateUserAccess: (userId, assignedProducts) => api.put(`/product-access/user/${userId}`, {
+    user_id: userId,
+    assigned_products: assignedProducts
   }),
   grantProductAccess: (productId, userIds) => api.post(`/product-access/product/${productId}/grant`, {
     product_id: productId,
@@ -267,9 +341,139 @@ export const depotAccessApi = {
   getMyDepots: () => api.get('/depot-access/my-depots'),
 };
 
+// Sources (Phase 1): server-filtered source dropdowns + source<->product mapping
+export const sourcesApi = {
+  getAll: (type) => api.get('/sources', { params: { type } }),
+};
+
+export const sourceAccessApi = {
+  getAll: () => api.get('/source-access'),
+  getSource: (sourceType, sourceId) => api.get(`/source-access/source/${sourceType}/${sourceId}`),
+  updateSource: (sourceType, sourceId, productIds) =>
+    api.put(`/source-access/source/${sourceType}/${sourceId}`, { product_ids: productIds }),
+};
+
+// Product master overrides + company pricing (Phase 1)
+export const productManagementApi = {
+  getOverrides: (companyId) => api.get('/product-overrides', { params: { company_id: companyId } }),
+  upsertOverride: (productId, data) => api.put(`/product-overrides/${productId}`, data),
+  deleteOverride: (productId, companyId) =>
+    api.delete(`/product-overrides/${productId}`, { params: { company_id: companyId } }),
+  getEffective: (productId, companyId) => api.get(`/products/${productId}/effective`, { params: { company_id: companyId } }),
+  getPricing: (companyId, productId) => api.get('/company-pricing', { params: { company_id: companyId, product_id: productId } }),
+  createPricing: (data) => api.post('/company-pricing', data),
+  updatePricing: (id, data) => api.put(`/company-pricing/${id}`, data),
+  deletePricing: (id) => api.delete(`/company-pricing/${id}`),
+};
+
+// Regions & Locations (Phase 2: region > location > depot)
+export const regionsApi = {
+  getAll: () => api.get('/regions'),
+  getOne: (id) => api.get(`/regions/${id}`),
+  create: (data) => api.post('/regions', data),
+  update: (id, data) => api.put(`/regions/${id}`, data),
+  delete: (id) => api.delete(`/regions/${id}`),
+};
+
+export const locationsApi = {
+  getAll: () => api.get('/locations'),
+  getOne: (id) => api.get(`/locations/${id}`),
+  create: (data) => api.post('/locations', data),
+  update: (id, data) => api.put(`/locations/${id}`, data),
+  delete: (id) => api.delete(`/locations/${id}`),
+  getTree: () => api.get('/locations/tree'),
+  getOverview: (id) => api.get(`/locations/${id}/overview`),
+};
+
+// Leads (Phase 2)
+export const leadsApi = {
+  getAll: (params) => api.get('/leads', { params }),
+  getOne: (id) => api.get(`/leads/${id}`),
+  create: (data) => api.post('/leads', data),
+  update: (id, data) => api.put(`/leads/${id}`, data),
+  delete: (id) => api.delete(`/leads/${id}`),
+  convert: (id) => api.post(`/leads/${id}/convert`),
+};
+
+// Firms (Phase 2)
+export const firmsApi = {
+  getAll: () => api.get('/firms'),
+  getOne: (id) => api.get(`/firms/${id}`),
+  create: (data) => api.post('/firms', data),
+  update: (id, data) => api.put(`/firms/${id}`, data),
+  delete: (id) => api.delete(`/firms/${id}`),
+  getOffices: (firmId) => api.get(`/firms/${firmId}/offices`),
+  addOffice: (firmId, data) => api.post(`/firms/${firmId}/offices`, data),
+  deleteOffice: (firmId, officeId) => api.delete(`/firms/${firmId}/offices/${officeId}`),
+  getFactories: (firmId) => api.get(`/firms/${firmId}/factories`),
+  addFactory: (firmId, data) => api.post(`/firms/${firmId}/factories`, data),
+  deleteFactory: (firmId, factoryId) => api.delete(`/firms/${firmId}/factories/${factoryId}`),
+  getAccess: (firmId) => api.get(`/firms/${firmId}/access`),
+  grantAccess: (firmId, data) => api.post(`/firms/${firmId}/access`, data),
+  revokeAccess: (firmId, grantId) => api.delete(`/firms/${firmId}/access/${grantId}`),
+};
+
+// Employees (Phase 3)
+export const employeesApi = {
+  getAll: (params) => api.get('/employees', { params }),
+  getOne: (id) => api.get(`/employees/${id}`),
+  create: (data) => api.post('/employees', data),
+  update: (id, data) => api.put(`/employees/${id}`, data),
+  delete: (id) => api.delete(`/employees/${id}`),
+  enableLogin: (id, data) => api.post(`/employees/${id}/enable-login`, data),
+  unlink: (id) => api.post(`/employees/${id}/unlink`),
+};
+
+export const departmentsApi = {
+  getAll: () => api.get('/departments'),
+  create: (data) => api.post('/departments', data),
+  update: (id, data) => api.put(`/departments/${id}`, data),
+  delete: (id) => api.delete(`/departments/${id}`),
+};
+
+export const designationsApi = {
+  getAll: () => api.get('/designations'),
+  create: (data) => api.post('/designations', data),
+  update: (id, data) => api.put(`/designations/${id}`, data),
+  delete: (id) => api.delete(`/designations/${id}`),
+};
+
+// Invoicing (Phase 4)
+export const invoicesApi = {
+  getAll: (status) => api.get('/invoices', { params: { status } }),
+  getOne: (id) => api.get(`/invoices/${id}`),
+  generate: (poId, data) => api.post('/invoices/generate', data, { params: { po_id: poId } }),
+  update: (id, data) => api.put(`/invoices/${id}`, data),
+  issue: (id) => api.post(`/invoices/${id}/issue`),
+  delete: (id) => api.delete(`/invoices/${id}`),
+  exportPdf: (id) => withDownloadToken(`${API_BASE}/invoices/${id}/export?format=pdf`),
+  exportExcel: (id) => withDownloadToken(`${API_BASE}/invoices/${id}/export?format=excel`),
+  reconcile: (id) => api.get(`/invoices/${id}/reconciliation`),
+  allocate: (id, paymentId, amount) =>
+    api.post(`/invoices/${id}/allocate`, { amount_allocated: amount }, { params: { payment_id: paymentId } }),
+  deallocate: (invoiceId, allocId) => api.delete(`/invoices/${invoiceId}/allocate/${allocId}`),
+};
+
+export const paymentsApi = {
+  getAll: (params) => api.get('/payments', { params }),
+  getOne: (id) => api.get(`/payments/${id}`),
+  create: (data) => api.post('/payments', data),
+  update: (id, data) => api.put(`/payments/${id}`, data),
+  delete: (id) => api.delete(`/payments/${id}`),
+};
+
+export const notesApi = {
+  getCreditNotes: (invoiceId) => api.get('/credit-notes', { params: { invoice_id: invoiceId } }),
+  createCreditNote: (data) => api.post('/credit-notes', data),
+  deleteCreditNote: (id) => api.delete(`/credit-notes/${id}`),
+  getDebitNotes: (invoiceId) => api.get('/debit-notes', { params: { invoice_id: invoiceId } }),
+  createDebitNote: (data) => api.post('/debit-notes', data),
+  deleteDebitNote: (id) => api.delete(`/debit-notes/${id}`),
+};
+
 // Analytics
 export const analyticsApi = {
-  getDashboard: () => api.get('/analytics/dashboard'),
+  getDashboard: (tenantId) => api.get('/analytics/dashboard', { params: tenantId ? { tenant_id: tenantId } : {} }),
 };
 
 // Reports
@@ -288,7 +492,7 @@ export const purchaseOrdersApi = {
   complete: (id, data) => api.put(`/purchase-orders/${id}/complete`, data),
   getStatement: (id) => api.get(`/purchase-orders/${id}/statement`),
   delete: (id) => api.delete(`/purchase-orders/${id}`),
-  exportStatement: (id, format) => `${API_BASE}/purchase-orders/${id}/statement/export?format=${format}`
+  exportStatement: (id, format) => withDownloadToken(`${API_BASE}/purchase-orders/${id}/statement/export?format=${format}`)
 };
 
 export const pickupApi = {
@@ -311,6 +515,8 @@ export const pickupApi = {
     api.put(`/pickups/${id}/company`, data),
   uploadTareSlip: (id, data) =>
     api.put(`/pickups/${id}/tare-slip`, data),
+  uploadWeightmentSlip: (id, data) =>
+    api.put(`/pickups/${id}/weightment-slip`, data),
   updateWeightment: (id, data) =>
     api.put(`/pickups/${id}/weightment`, data),
   finalVerify: (id, data) =>
@@ -326,6 +532,44 @@ export const verifiedTrucksApi = {
   delete: (id) => api.delete(`/verified-trucks/${id}`),
 };
 
+// Stock Transfers (Phase 5)
+export const stockTransfersApi = {
+  getAll: (params) => api.get('/stock-transfers', { params }),
+  getOne: (id) => api.get(`/stock-transfers/${id}`),
+  create: (data) => api.post('/stock-transfers', data),
+  approve: (id, notes) => api.post(`/stock-transfers/${id}/approve`, { notes }),
+  dispatch: (id, notes) => api.post(`/stock-transfers/${id}/dispatch`, { notes }),
+  receive: (id, notes) => api.post(`/stock-transfers/${id}/receive`, { notes }),
+  reject: (id, notes) => api.post(`/stock-transfers/${id}/reject`, { notes }),
+  cancel: (id, notes) => api.post(`/stock-transfers/${id}/cancel`, { notes }),
+  getAudit: (id) => api.get(`/stock-transfers/${id}/audit`),
+  exportLedger: () => withDownloadToken(`${API_BASE}/stock-transfers/export`),
+};
+
+export const approvalMatricesApi = {
+  getAll: () => api.get('/approval-matrices'),
+  create: (data) => api.post('/approval-matrices', data),
+  update: (id, data) => api.put(`/approval-matrices/${id}`, data),
+  delete: (id) => api.delete(`/approval-matrices/${id}`),
+};
+
+// Usage (Phase 6)
+export const usageApi = {
+  getSummary: (days) => api.get('/usage/summary', { params: { days } }),
+  getLogs: (params) => api.get('/usage/logs', { params }),
+  quotaCheck: (key) => api.get('/usage/quota-check', { params: { key } }),
+};
+
+// Billing (Phase 6)
+export const billingApi = {
+  listSubscriptions: () => api.get('/billing/subscriptions'),
+  getSubscription: (tenantId) => api.get(`/billing/subscriptions/${tenantId}`),
+  upsertSubscription: (data) => api.post('/billing/subscriptions', data),
+  createCheckout: (tenantId, plan, provider) => api.post(`/billing/checkout/${tenantId}`, null, { params: { plan, provider } }),
+  createPortal: (tenantId, provider) => api.post(`/billing/portal/${tenantId}`, null, { params: { provider } }),
+  webhook: (provider, payload) => api.post(`/billing/webhook/${provider}`, payload),
+};
+
 // File Upload
 export const uploadFile = async (file) => {
   const formData = new FormData();
@@ -336,6 +580,6 @@ export const uploadFile = async (file) => {
   return response.data;
 };
 
-export const getFileUrl = (fileId) => `${API_BASE}/uploads/${fileId}`;
+export const getFileUrl = (fileId) => withDownloadToken(`${API_BASE}/uploads/${fileId}`);
 
 export default api;

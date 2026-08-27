@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
 import { Sidebar } from "./components/layout/Sidebar";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { PermissionsProvider, usePermissions } from "./lib/permissions";
+import { ThemeProvider } from "./lib/theme";
+import { FeatureGate } from "./components/FeatureGate";
+import { BillingBanner } from "./components/BillingBanner";
 import { getOfflineQueueCount } from "./lib/offline";
 import { toast } from "sonner";
 
@@ -35,9 +39,22 @@ import VerifyPickup from "./pages/VerifyPickup";
 import FinalDispatchVerification from "./pages/FinalDispatchVerification";
 import RailwayZones from "./pages/RailwayZones";
 import VerifiedTruckDetailsPage from "./pages/VerifiedTruckDetails";
+import Downloads from "./pages/Downloads";
+import Tenants from "./pages/Tenants";
+import RegionsAndLocations from "./pages/RegionsAndLocations";
+import Leads from "./pages/Leads";
+import Firms from "./pages/Firms";
+import Employees from "./pages/Employees";
+import DepartmentsDesignations from "./pages/DepartmentsDesignations";
+import Invoices from "./pages/Invoices";
+import Payments from "./pages/Payments";
+import Notes from "./pages/Notes";
+import StockTransfers from "./pages/StockTransfers";
+import UsageDashboard from "./pages/UsageDashboard";
+import Billing from "./pages/Billing";
 
 // Protected Route Component with Dynamic Permissions
-const ProtectedRoute = ({ children, permission }) => {
+const ProtectedRoute = ({ children, permission, masterOnly }) => {
   const { user, loading: authLoading } = useAuth();
   const { hasPermission, loading: permLoading } = usePermissions();
   if (authLoading || permLoading) {
@@ -52,6 +69,11 @@ const ProtectedRoute = ({ children, permission }) => {
     return <Navigate to="/login" replace />;
   }
 
+  // Platform-level pages are restricted to the master admin.
+  if (masterOnly && !user.is_master_admin) {
+    return <Navigate to="/" replace />;
+  }
+
   // Check dynamic permission for this route
   if (permission && !hasPermission(permission)) {
     return <Navigate to="/" replace />;
@@ -62,11 +84,32 @@ const ProtectedRoute = ({ children, permission }) => {
 
 // Layout with Sidebar
 const AppLayout = ({ children }) => {
+  const { isSuspended } = useAuth();
+  if (isSuspended) {
+    return (
+      <div className="main-layout">
+        <Sidebar />
+        <div className="content-area">
+          <BillingBanner />
+          <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-6">
+            <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-rose-200 p-8 text-center space-y-4">
+              <div className="w-12 h-12 mx-auto bg-rose-50 border border-rose-200 text-rose-600 rounded-full flex items-center justify-center">✕</div>
+              <h2 className="text-lg font-bold text-slate-900">Workspace suspended</h2>
+              <p className="text-sm text-slate-500">Your subscription was canceled and your workspace is suspended. Kindly contact Platform support to reactivate.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="main-layout">
       <Sidebar />
       <div className="content-area">
-        {children}
+        <BillingBanner />
+        <div className="overflow-x-auto min-w-0 pt-4 lg:pt-0">
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -104,7 +147,7 @@ function AppRoutes() {
       <Route path="/liftings" element={
         // <ProtectedRoute permission="Liftings (View)">
         // </ProtectedRoute>
-          <AppLayout><Liftings /></AppLayout>
+        <AppLayout><Liftings /></AppLayout>
       } />
 
       <Route path="/schedule-pickup" element={
@@ -236,6 +279,11 @@ function AppRoutes() {
       } />
 
 
+      <Route path="/downloads" element={
+        <ProtectedRoute permission="Downloads (View)">
+          <AppLayout><Downloads /></AppLayout>
+        </ProtectedRoute>
+      } />
 
 
       <Route path="/railway-zones" element={
@@ -244,9 +292,77 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
+      <Route path="/tenants" element={
+        <ProtectedRoute permission="Tenants (View)" masterOnly>
+          <AppLayout><Tenants /></AppLayout>
+        </ProtectedRoute>
+      } />
 
+      <Route path="/regions-locations" element={
+        <ProtectedRoute permission="Locations (View)">
+          <AppLayout><RegionsAndLocations /></AppLayout>
+        </ProtectedRoute>
+      } />
 
+      <Route path="/leads" element={
+        <ProtectedRoute permission="Leads (View)">
+          <AppLayout><FeatureGate feature="leads"><Leads /></FeatureGate></AppLayout>
+        </ProtectedRoute>
+      } />
 
+      <Route path="/firms" element={
+        <ProtectedRoute permission="Firms (View)">
+          <AppLayout><FeatureGate feature="firms"><Firms /></FeatureGate></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/employees" element={
+        <ProtectedRoute permission="Employees (View)">
+          <AppLayout><Employees /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/departments-designations" element={
+        <ProtectedRoute permission="Departments (View)">
+          <AppLayout><DepartmentsDesignations /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/invoices" element={
+        <ProtectedRoute permission="Invoices (View)">
+          <AppLayout><FeatureGate feature="invoices"><Invoices /></FeatureGate></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/payments" element={
+        <ProtectedRoute permission="Payments (View)">
+          <AppLayout><FeatureGate feature="invoices"><Payments /></FeatureGate></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/notes" element={
+        <ProtectedRoute permission="Credit Notes (View)">
+          <AppLayout><FeatureGate feature="invoices"><Notes /></FeatureGate></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/stock-transfers" element={
+        <ProtectedRoute permission="Stock Transfers (View)">
+          <AppLayout><FeatureGate feature="stock_transfers"><StockTransfers /></FeatureGate></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/usage" element={
+        <ProtectedRoute permission="Usage (View)">
+          <AppLayout><UsageDashboard /></AppLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/billing" element={
+        <ProtectedRoute masterOnly>
+          <AppLayout><Billing /></AppLayout>
+        </ProtectedRoute>
+      } />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -307,18 +423,33 @@ const OfflineBanner = () => {
   );
 };
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      staleTime: 0,
+      retry: 1,
+    },
+  },
+});
+
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <AuthProvider>
-          <PermissionsProvider>
-            <AppRoutes />
-            <OfflineBanner />
-            <Toaster position="top-right" richColors />
-          </PermissionsProvider>
-        </AuthProvider>
-      </BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <PermissionsProvider>
+              <ThemeProvider>
+                <AppRoutes />
+                <OfflineBanner />
+                <Toaster position="top-right" richColors />
+              </ThemeProvider>
+            </PermissionsProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
     </div>
   );
 }

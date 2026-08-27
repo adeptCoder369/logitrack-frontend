@@ -2,6 +2,12 @@
 
 # dependencies
 /node_modules
+/android
+/build
+/.env
+.env
+/env
+env
 /.pnp
 .pnp.js
 
@@ -21,6 +27,3 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-
-.env

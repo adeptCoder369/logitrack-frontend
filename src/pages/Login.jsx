@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
-import { Truck, ArrowLeft, Phone, Lock, KeyRound, RefreshCw, UserPlus } from 'lucide-react';
+import { Truck, ArrowLeft, Phone, Lock, KeyRound, RefreshCw, UserPlus, ShieldCheck, Package, Warehouse, BarChart3, Building2, ArrowRightLeft } from 'lucide-react';
 
 const COUNTRY_CODES = [
   { code: "91", name: "India", flag: "🇮🇳" },
@@ -29,10 +29,11 @@ export default function Login() {
   const [activeView, setActiveView] = useState('main'); // main, loginOtp, forgotPassword, firstTimeSetup
 
   // Login states
-  const [loginData, setLoginData] = useState({ 
-    mobile: '', 
-    password: '', 
-    countryCode: '91' 
+  const [loginData, setLoginData] = useState({
+    mobile: '',
+    password: '',
+    countryCode: '91',
+    tenant: ''
   });
 
   // OTP Login states
@@ -40,6 +41,7 @@ export default function Login() {
     mobile: '',
     countryCode: '91',
     otp: '',
+    tenant: '',
     step: 'mobile' // mobile, otp
   });
 
@@ -50,6 +52,7 @@ export default function Login() {
     otp: '',
     newPassword: '',
     confirmPassword: '',
+    tenant: '',
     step: 'mobile' // mobile, otp, password
   });
 
@@ -60,6 +63,7 @@ export default function Login() {
     otp: '',
     newPassword: '',
     confirmPassword: '',
+    tenant: '',
     demoOtp: ''
   });
 
@@ -110,9 +114,10 @@ export default function Login() {
       const response = await authApi.login({
         mobile: loginData.mobile,
         country_code: loginData.countryCode,
-        password: loginData.password
+        password: loginData.password,
+        tenant: loginData.tenant || undefined
       });
-      
+
       // Check if this is a first-time login
       if (response.data.first_time_login) {
         toast.info(response.data.message);
@@ -122,6 +127,7 @@ export default function Login() {
           otp: '',
           newPassword: '',
           confirmPassword: '',
+          tenant: loginData.tenant,
           demoOtp: response.data.demo_otp || ''
         });
         setActiveView('firstTimeSetup');
@@ -162,9 +168,10 @@ export default function Login() {
         mobile: firstTimeData.mobile,
         country_code: firstTimeData.countryCode,
         otp_code: firstTimeData.otp,
-        new_password: firstTimeData.newPassword
+        new_password: firstTimeData.newPassword,
+        tenant: firstTimeData.tenant || undefined
       });
-      
+
       const { token, user } = response.data;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -188,7 +195,8 @@ export default function Login() {
     try {
       const response = await authApi.requestLoginOtp({
         mobile: otpLoginData.mobile,
-        country_code: otpLoginData.countryCode
+        country_code: otpLoginData.countryCode,
+        tenant: otpLoginData.tenant || undefined
       });
       toast.success(response.data.message);
       setOtpLoginData(prev => ({ ...prev, step: 'otp' }));
@@ -207,7 +215,7 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      await loginWithOtp(otpLoginData.mobile, otpLoginData.countryCode, otpLoginData.otp);
+      await loginWithOtp(otpLoginData.mobile, otpLoginData.countryCode, otpLoginData.otp, otpLoginData.tenant || undefined);
       toast.success('Login successful!');
       navigate('/');
     } catch (error) {
@@ -227,7 +235,8 @@ export default function Login() {
     try {
       const response = await authApi.forgotPassword({
         mobile: forgotData.mobile,
-        country_code: forgotData.countryCode
+        country_code: forgotData.countryCode,
+        tenant: forgotData.tenant || undefined
       });
       toast.success(response.data.message);
       setForgotData(prev => ({ ...prev, step: 'otp' }));
@@ -262,11 +271,12 @@ export default function Login() {
         mobile: forgotData.mobile,
         country_code: forgotData.countryCode,
         otp_code: forgotData.otp,
-        new_password: forgotData.newPassword
+        new_password: forgotData.newPassword,
+        tenant: forgotData.tenant || undefined
       });
       toast.success('Password reset successfully! Please login.');
       setActiveView('main');
-      setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', step: 'mobile' });
+      setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', tenant: '', step: 'mobile' });
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to reset password');
     } finally {
@@ -276,7 +286,7 @@ export default function Login() {
 
   const handleResendOtp = async (purpose) => {
     if (otpTimer > 0) return;
-    
+
     let mobile, countryCode;
     if (purpose === 'login') {
       mobile = otpLoginData.mobile;
@@ -284,14 +294,15 @@ export default function Login() {
     } else if (purpose === 'reset_password') {
       mobile = forgotData.mobile;
       countryCode = forgotData.countryCode;
-    } else if (purpose === 'first_time_setup') {
+      } else if (purpose === 'first_time_setup') {
       // Re-trigger login to get new OTP
       setLoading(true);
       try {
         const response = await authApi.login({
           mobile: firstTimeData.mobile,
           country_code: firstTimeData.countryCode,
-          password: '' // Empty password triggers OTP for first-time users
+          password: '', // Empty password triggers OTP for first-time users
+          tenant: firstTimeData.tenant || undefined
         });
         if (response.data.first_time_login) {
           toast.success(response.data.message);
@@ -324,16 +335,14 @@ export default function Login() {
 
   const renderHeader = () => (
     <div className="text-center mb-8">
-      <img 
-        src="https://customer-assets.emergentagent.com/job_delivery-hub-237/artifacts/gckg95ms_Info%20Eight_su_5a.png" 
-        alt="InfoEIGHT" 
-        className="h-16 mx-auto mb-4"
+     
+      <img
+        src='icons/icon-512.webp'
+        alt='IBRMCO Logo'
+        className='h-16 mx-auto mb-4 rounded-full border-2 border-slate-700'
       />
-      <div className="inline-flex items-center justify-center w-14 h-14 bg-orange-500 rounded-2xl mb-3">
-        <Truck className="w-8 h-8 text-white" />
-      </div>
       <h1 className="text-3xl font-bold text-white" style={{ fontFamily: 'Manrope' }}>
-        LogiTrack Pro
+        IBRMCO   Pro
       </h1>
       <p className="text-slate-400 mt-1 text-sm">Powered by InfoEIGHT</p>
     </div>
@@ -387,6 +396,22 @@ export default function Login() {
     </div>
   );
 
+  const renderTenantInput = (data, setData, prefix = '') => (
+    <div className="space-y-2">
+      <Label htmlFor={`${prefix}tenant`}>
+        Tenant <span className="text-slate-400 font-normal">(optional — required only if your mobile exists in more than one workspace)</span>
+      </Label>
+      <Input
+        id={`${prefix}tenant`}
+        value={data.tenant}
+        onChange={(e) => setData({ ...data, tenant: e.target.value.trim().toLowerCase() })}
+        placeholder="Workspace slug"
+        className="pl-10"
+        data-testid={`${prefix}tenant`}
+      />
+    </div>
+  );
+
   const renderOtpInput = (value, onChange, purpose) => (
     <div className="space-y-2">
       <Label htmlFor={`${purpose}-otp`}>Enter OTP</Label>
@@ -405,13 +430,13 @@ export default function Login() {
       <div className="flex justify-between items-center text-sm">
         {otpTimer > 0 ? (
           <span className="text-slate-500">
-            Resend in <span className="text-orange-500 font-medium">{formatTime(otpTimer)}</span>
+            Resend in <span className="text-accent-brand font-medium">{formatTime(otpTimer)}</span>
           </span>
         ) : (
           <button
             type="button"
             onClick={() => handleResendOtp(purpose)}
-            className="text-orange-500 hover:text-orange-400 flex items-center"
+            className="text-accent-brand hover:text-accent-brand/80 flex items-center"
             disabled={loading}
           >
             <RefreshCw className="w-3 h-3 mr-1" />
@@ -432,6 +457,7 @@ export default function Login() {
       <CardContent>
         <form onSubmit={handlePasswordLogin} className="space-y-4">
           {renderMobileInput(loginData, setLoginData, 'login-')}
+          {renderTenantInput(loginData, setLoginData, 'login-')}
           <div className="space-y-2">
             <Label htmlFor="login-password">Password</Label>
             <div className="relative">
@@ -450,21 +476,21 @@ export default function Login() {
               First time? Enter any password to receive OTP
             </p>
           </div>
-          <Button 
-            type="submit" 
-            className="w-full bg-slate-900 hover:bg-slate-800"
+          <Button
+            type="submit"
+            className="w-full bg-brand hover:bg-brand/90 text-primary-foreground"
             disabled={loading}
             data-testid="login-submit"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
-        
+
         <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
           <button
             type="button"
             onClick={() => setActiveView('loginOtp')}
-            className="w-full text-sm text-orange-600 hover:text-orange-500 flex items-center justify-center"
+            className="w-full text-sm text-accent-brand hover:text-accent-brand/80 flex items-center justify-center"
           >
             <KeyRound className="w-4 h-4 mr-2" />
             Login with OTP
@@ -492,10 +518,10 @@ export default function Login() {
   const renderLoginOtp = () => (
     <Card className="border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
-        {renderBackButton('main', () => setOtpLoginData({ mobile: '', countryCode: '91', otp: '', step: 'mobile' }))}
+        {renderBackButton('main', () => setOtpLoginData({ mobile: '', countryCode: '91', otp: '', tenant: '', step: 'mobile' }))}
         <CardTitle style={{ fontFamily: 'Manrope' }}>Login with OTP</CardTitle>
         <CardDescription>
-          {otpLoginData.step === 'mobile' 
+          {otpLoginData.step === 'mobile'
             ? 'Enter your registered mobile number'
             : `Enter OTP sent to +${otpLoginData.countryCode}${otpLoginData.mobile}`}
         </CardDescription>
@@ -504,9 +530,10 @@ export default function Login() {
         {otpLoginData.step === 'mobile' ? (
           <>
             {renderMobileInput(otpLoginData, setOtpLoginData, 'otpLogin-')}
-            <Button 
+            {renderTenantInput(otpLoginData, setOtpLoginData, 'otpLogin-')}
+            <Button
               onClick={handleRequestLoginOtp}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="request-login-otp"
             >
@@ -516,9 +543,9 @@ export default function Login() {
         ) : (
           <>
             {renderOtpInput(otpLoginData.otp, (val) => setOtpLoginData(prev => ({ ...prev, otp: val })), 'login')}
-            <Button 
+            <Button
               onClick={handleVerifyLoginOtp}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="verify-login-otp"
             >
@@ -534,7 +561,7 @@ export default function Login() {
   const renderForgotPassword = () => (
     <Card className="border-0 shadow-2xl">
       <CardHeader className="text-center pb-2">
-        {renderBackButton('main', () => setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', step: 'mobile' }))}
+        {renderBackButton('main', () => setForgotData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', tenant: '', step: 'mobile' }))}
         <CardTitle style={{ fontFamily: 'Manrope' }}>Reset Password</CardTitle>
         <CardDescription>
           {forgotData.step === 'mobile' && 'Enter your registered mobile number'}
@@ -546,9 +573,10 @@ export default function Login() {
         {forgotData.step === 'mobile' && (
           <>
             {renderMobileInput(forgotData, setForgotData, 'forgot-')}
-            <Button 
+            {renderTenantInput(forgotData, setForgotData, 'forgot-')}
+            <Button
               onClick={handleForgotPasswordSendOtp}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="forgot-send-otp"
             >
@@ -556,13 +584,13 @@ export default function Login() {
             </Button>
           </>
         )}
-        
+
         {forgotData.step === 'otp' && (
           <>
             {renderOtpInput(forgotData.otp, (val) => setForgotData(prev => ({ ...prev, otp: val })), 'reset_password')}
-            <Button 
+            <Button
               onClick={handleForgotPasswordVerifyOtp}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="forgot-verify-otp"
             >
@@ -570,7 +598,7 @@ export default function Login() {
             </Button>
           </>
         )}
-        
+
         {forgotData.step === 'password' && (
           <>
             <div className="space-y-2">
@@ -603,9 +631,9 @@ export default function Login() {
                 />
               </div>
             </div>
-            <Button 
+            <Button
               onClick={handleResetPassword}
-              className="w-full bg-orange-500 hover:bg-orange-600"
+              className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
               disabled={loading}
               data-testid="reset-password-submit"
             >
@@ -629,7 +657,7 @@ export default function Login() {
       </CardHeader>
       <CardContent className="space-y-4">
         {renderOtpInput(firstTimeData.otp, (val) => setFirstTimeData(prev => ({ ...prev, otp: val })), 'first_time_setup')}
-        
+
         <div className="space-y-2">
           <Label htmlFor="setup-password">Create Password</Label>
           <div className="relative">
@@ -645,7 +673,7 @@ export default function Login() {
             />
           </div>
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="setup-confirm-password">Confirm Password</Label>
           <div className="relative">
@@ -661,21 +689,21 @@ export default function Login() {
             />
           </div>
         </div>
-        
-        <Button 
+
+        <Button
           onClick={handleFirstTimeSetup}
-          className="w-full bg-orange-500 hover:bg-orange-600"
+          className="w-full bg-accent-brand hover:bg-accent-brand/90 text-accent-foreground"
           disabled={loading}
           data-testid="first-time-setup-submit"
         >
           {loading ? 'Setting up...' : 'Set Password & Login'}
         </Button>
-        
+
         <button
           type="button"
           onClick={() => {
             setActiveView('main');
-            setFirstTimeData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', demoOtp: '' });
+            setFirstTimeData({ mobile: '', countryCode: '91', otp: '', newPassword: '', confirmPassword: '', tenant: '', demoOtp: '' });
           }}
           className="w-full text-sm text-slate-500 hover:text-slate-700 mt-2"
         >
@@ -686,18 +714,77 @@ export default function Login() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {renderHeader()}
-        
-        {activeView === 'main' && renderMainLogin()}
-        {activeView === 'loginOtp' && renderLoginOtp()}
-        {activeView === 'forgotPassword' && renderForgotPassword()}
-        {activeView === 'firstTimeSetup' && renderFirstTimeSetup()}
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Left — Brand / Story (hidden on mobile) */}
+      <div className="hidden lg:flex lg:w-[52%] brand-gradient relative flex-col justify-between p-10 xl:p-14 text-white overflow-hidden">
+        {/* subtle pattern */}
+        <div className="absolute inset-0 bg-black/10" />
+        <div className="absolute -top-20 -right-20 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+              <Truck className="w-5 h-5 text-slate-900" />
+            </div>
+            <span className="text-lg font-bold tracking-widest uppercase" style={{ fontFamily: 'Manrope' }}>IBRMCO Pro</span>
+            <span className="ml-2 px-2 py-0.5 rounded bg-white/20 text-[10px] font-bold tracking-wider">v2.1</span>
+          </div>
+          <h1 className="text-4xl xl:text-[42px] font-extrabold leading-tight" style={{ fontFamily: 'Manrope' }}>
+            Logistics,<br />Unified.
+          </h1>
+          <p className="mt-4 text-white/80 text-sm xl:text-[15px] leading-relaxed max-w-md">
+            Multi-tenant SaaS for depots, inventory, dispatches and billing — one workspace per client, one login per role.
+          </p>
+          <div className="mt-8 grid grid-cols-1 gap-3 max-w-sm">
+            {[
+              { icon: Warehouse, label: 'Inventory Wallet', desc: 'Real-time depot & company stock' },
+              { icon: ArrowRightLeft, label: 'Stock Transfers', desc: 'Depot ↔ Company with approvals' },
+              { icon: Building2, label: 'Tenants & Branding', desc: 'Workspace + primary/accent per client' },
+              { icon: ShieldCheck, label: 'Role-based Access', desc: 'Products / Depots / Tenants scoped' },
+            ].map(item => (
+              <div key={item.label} className="flex gap-3 items-center bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/10">
+                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
+                  <item.icon className="w-4 h-4 text-slate-900" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold leading-none">{item.label}</p>
+                  <p className="text-xs text-white/70 leading-none mt-1">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="relative z-10 flex items-center justify-between text-xs text-white/60">
+          <span>Powered by InfoEIGHT</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" /> Secure</span>
+        </div>
+      </div>
 
-        <p className="text-center text-slate-500 mt-6 text-sm">
-          LogiTrack Pro v2.1 | InfoEIGHT Solutions
-        </p>
+      {/* Right — Form */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-10 bg-slate-50">
+        {/* Mobile brand header */}
+        <div className="lg:hidden flex items-center gap-2.5 mb-6 w-full max-w-md">
+          <div className="w-9 h-9 brand-gradient rounded-xl flex items-center justify-center shadow">
+            <Truck className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold tracking-widest uppercase text-slate-900" style={{ fontFamily: 'Manrope' }}>IBRMCO Pro</p>
+            <p className="text-xs text-slate-500">Powered by InfoEIGHT</p>
+          </div>
+        </div>
+        <div className="w-full max-w-md">
+          {/* subtle tenant hint */}
+          <div className="mb-4 flex items-center justify-center gap-2 text-[11px] text-slate-500">
+            <span className="px-2 py-1 rounded-full bg-white border text-slate-600">Tenant slug required only if mobile in multiple workspaces</span>
+          </div>
+          {activeView === 'main' && renderMainLogin()}
+          {activeView === 'loginOtp' && renderLoginOtp()}
+          {activeView === 'forgotPassword' && renderForgotPassword()}
+          {activeView === 'firstTimeSetup' && renderFirstTimeSetup()}
+          <p className="text-center text-slate-400 mt-6 text-xs">
+            IBRMCO v2.1 • InfoEIGHT Solutions 
+          </p>
+        </div>
       </div>
     </div>
   );
