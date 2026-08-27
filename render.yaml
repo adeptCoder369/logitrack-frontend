@@ -3,7 +3,12 @@ services:
     name: logitrack-frontend
     env: static
     plan: free
-    buildCommand: npm install --legacy-peer-deps --include=dev && CI=false npm run build
+    # Long-term: works with default `npm install` + `npm run build`
+    # - .npmrc sets legacy-peer-deps=true (fixes React 19 peer conflict)
+    # - package.json moves craco/workbox/tailwind to dependencies (fixes craco not found when NODE_ENV=production skips devDeps)
+    # - craco.config.js forces CI=false (fixes warnings-as-errors)
+    # - engines + .nvmrc pin Node 20 but allow >=20 for Render default 24
+    buildCommand: CI=false npm run build
     staticPublishPath: build
     envVars:
       - key: NODE_VERSION

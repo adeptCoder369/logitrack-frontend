@@ -84,8 +84,8 @@
     "globals": "15.15.0"
   },
   "engines": {
-    "node": "20.x",
-    "npm": "10.x"
+    "node": "24.x",
+    "npm": "11.x"
   },
   "scripts": {
     "start": "craco start",
