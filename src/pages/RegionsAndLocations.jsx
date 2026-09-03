@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Map,
   Layers,
@@ -452,17 +452,17 @@ export default function RegionsAndLocations() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const loadRegions = async () => {
+  const loadRegions = useCallback(async () => {
     const res = await regionsApi.getAll();
     setRegions(res.data || []);
-  };
+  }, []);
 
-  const loadLocations = async () => {
+  const loadLocations = useCallback(async () => {
     const res = await locationsApi.getAll();
     setLocations(res.data || []);
-  };
+  }, []);
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       await Promise.all([loadRegions(), loadLocations()]);
@@ -471,11 +471,11 @@ export default function RegionsAndLocations() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadRegions, loadLocations]);
 
   useEffect(() => {
     loadAll();
-  }, []);
+  }, [loadAll]);
 
   const filteredLocations = locations.filter((l) =>
     (l.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||

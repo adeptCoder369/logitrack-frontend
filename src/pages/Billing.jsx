@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CreditCard, ExternalLink, Plus, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ export default function Billing() {
   const [saving, setSaving] = useState(false);
   const [webhookPayload, setWebhookPayload] = useState('{"type":"invoice.paid","data":{"object":{"id":"sub_test","status":"active"}}}');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       if (isPlatform) {
@@ -39,9 +39,9 @@ export default function Billing() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isPlatform, user?.tenant_id]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const handleUpsert = async (e) => {
     e.preventDefault();

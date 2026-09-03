@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { PageLayout } from '../components/layout/PageLayout';
 import { DataTable } from '../components/shared/DataTable';
@@ -240,16 +240,7 @@ companyId: urlCompanyId || '',
     unloading_point_name: '',
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Apply filters whenever filters or liftings change
-  useEffect(() => {
-    applyFilters();
-  }, [filters, liftings]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
         const canViewDeliveryOrders = hasPermission('Delivery Orders (View)');
         const canViewCompanies = hasPermission('Companies (View)');
@@ -304,41 +295,9 @@ companyId: urlCompanyId || '',
     } finally {
       setLoading(false);
     }
-  };
-  
-  const handlePurchaseOrderChange = (poId) => {
-    const po = purchaseOrders.find(p => p.id === poId);
+  }, [hasPermission]);
 
-    if (po) {
-      const transportMode = po.transport_mode || 'Road';
-      const isCompanySource = po.source_type === 'Company';
-      
-      setSelectedTransportMode(transportMode);
-
-      setFormData({
-        ...formData,
-        purchase_order_id: po.id,
-        purchase_order_no: po.po_number,
-
-        product_id: po.product_id,
-        product_name: po.product_name,
-        product_code: po.product_code,
-
-        loading_point_type: isCompanySource ? 'Company' : 'Depot',
-        loading_point_id: po.depot_id,
-        loading_point_name: po.depot_name,
-
-        unloading_point_type: 'Company',
-        unloading_point_id: po.to_company_id,
-        unloading_point_name: po.to_company_name,
-
-        transport_mode: transportMode
-      });
-    }
-  };
-    
-
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = [...liftings];
     
     // Always exclude Secondary liftings from display
@@ -394,7 +353,48 @@ companyId: urlCompanyId || '',
     }
     
     setFilteredLiftings(filtered);
+  }, [filters, liftings]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Apply filters whenever filters or liftings change
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+  
+  const handlePurchaseOrderChange = (poId) => {
+    const po = purchaseOrders.find(p => p.id === poId);
+
+    if (po) {
+      const transportMode = po.transport_mode || 'Road';
+      const isCompanySource = po.source_type === 'Company';
+      
+      setSelectedTransportMode(transportMode);
+
+      setFormData({
+        ...formData,
+        purchase_order_id: po.id,
+        purchase_order_no: po.po_number,
+
+        product_id: po.product_id,
+        product_name: po.product_name,
+        product_code: po.product_code,
+
+        loading_point_type: isCompanySource ? 'Company' : 'Depot',
+        loading_point_id: po.depot_id,
+        loading_point_name: po.depot_name,
+
+        unloading_point_type: 'Company',
+        unloading_point_id: po.to_company_id,
+        unloading_point_name: po.to_company_name,
+
+        transport_mode: transportMode
+      });
+    }
   };
+    
 
   const clearFilters = () => {
     setFilters({

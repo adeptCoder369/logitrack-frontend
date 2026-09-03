@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PageLayout } from "../components/layout/PageLayout";
 import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -68,7 +68,7 @@ export default function FinalDispatchVerification() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmRow, setConfirmRow] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [
@@ -109,11 +109,11 @@ export default function FinalDispatchVerification() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [startDate, endDate]);
 
   useEffect(() => {
     fetchData();
-  }, [startDate, endDate, statusFilter]);
+  }, [fetchData, statusFilter]);
 
   const handleStartDateChange = (val) => {
     const today = new Date().toISOString().split("T")[0];

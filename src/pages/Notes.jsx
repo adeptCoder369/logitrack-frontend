@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FileText, Plus, Search, Trash2, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -17,7 +17,7 @@ function NotesTab({ type }) {
   const [formData, setFormData] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = type === 'credit' ? await notesApi.getCreditNotes() : await notesApi.getDebitNotes();
@@ -27,7 +27,7 @@ function NotesTab({ type }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [type]);
 
   useEffect(() => {
     load();
@@ -37,7 +37,7 @@ function NotesTab({ type }) {
         setInvoices(res.data || []);
       } catch {}
     })();
-  }, [type]);
+  }, [load]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

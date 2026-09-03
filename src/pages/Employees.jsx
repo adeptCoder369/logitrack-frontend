@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, UserCog, Plus, Search, Trash2, Edit2, KeyRound, Lock, Phone, Mail, Building2
 } from 'lucide-react';
@@ -24,7 +24,7 @@ function EmployeeList({ employeeType, onEdit, onEnableLogin }) {
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [emps, comps, depts, desigs] = await Promise.all([
@@ -42,9 +42,9 @@ function EmployeeList({ employeeType, onEdit, onEnableLogin }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [employeeType]);
 
-  useEffect(() => { load(); }, [employeeType]);
+  useEffect(() => { load(); }, [load]);
 
   const companyName = (id) => companies.find((c) => c.id === id)?.name || '—';
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -40,11 +40,7 @@ export default function Analytics() {
     }
   }, [isMaster]);
 
-  useEffect(() => {
-    fetchData();
-  }, [period, selectedTenant]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const tenantId = isMaster && selectedTenant !== 'all' ? selectedTenant : undefined;
@@ -59,7 +55,11 @@ export default function Analytics() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isMaster, selectedTenant]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData, period]);
 
   // Process orders for trend data
   const getOrderTrendData = () => {

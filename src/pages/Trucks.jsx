@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { PageLayout } from "../components/layout/PageLayout";
 import { TrucksDataTable } from "../components/trucks/DataTable";
 import { FormModal } from "../components/shared/FormModal";
@@ -92,10 +92,6 @@ rc: { front: null, back: null },
   });
   const [viewOpen, setViewOpen] = useState(false);
   const [viewItem, setViewItem] = useState(null);
-
-  useEffect(() => {
-    fetchData();
-  }, [currentUser]);
 
   const renderDocumentStatus = (docValue, docLabel = "Document") => {
     const handleDownload = (fileId, label) => {
@@ -548,7 +544,7 @@ rc: { front: null, back: null },
     // ...helperColumns,
   ];
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [trucksRes, transportersRes] = await Promise.all([
         trucksApi.getAll(),
@@ -568,7 +564,11 @@ rc: { front: null, back: null },
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser?.role, currentUser?.transporter_id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleAdd = () => {
     setSelectedItem(null);

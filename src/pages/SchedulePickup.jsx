@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageLayout } from "../components/layout/PageLayout";
 import { Card, CardContent } from "../components/ui/card";
@@ -65,13 +65,15 @@ export default function SchedulePickup() {
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const mappedCompanyIds = currentUser?.role === "Transporter"
-    ? transporters.find((t) => t.id === currentUser?.transporter_id)?.company_ids || []
-    : [];
+  const mappedCompanyIds = useMemo(() => {
+    if (currentUser?.role !== "Transporter") return [];
+    return transporters.find((t) => t.id === currentUser?.transporter_id)?.company_ids || [];
+  }, [currentUser?.role, currentUser?.transporter_id, transporters]);
 
-  const mappedCompanies = currentUser?.role === "Transporter"
-    ? companies.filter((company) => mappedCompanyIds.includes(company.id))
-    : companies;
+  const mappedCompanies = useMemo(() => {
+    if (currentUser?.role !== "Transporter") return companies;
+    return companies.filter((company) => mappedCompanyIds.includes(company.id));
+  }, [currentUser?.role, companies, mappedCompanyIds]);
   const getTransporterOptionLabel = (transporter) => {
     if (currentUser?.role === "Transporter" && transporter?.id === currentUser?.transporter_id) {
       return `Your Transporter: ${transporter?.name || ""}`.trim();
@@ -80,22 +82,22 @@ export default function SchedulePickup() {
     return transporter?.name || "-";
   };
 
-  const getDateString = (offset) => {
+  const getDateString = useCallback((offset) => {
     const d = new Date();
     d.setDate(d.getDate() + offset);
     return d.toISOString().split("T")[0];
-  };
-  const filterBySourceId = (items) => {
+  }, []);
+  const filterBySourceId = useCallback((items) => {
     if (!selectedDepotFilter) return items;
     return items.filter((item) => item.source_id === selectedDepotFilter);
-  };
+  }, [selectedDepotFilter]);
 
-  const filterBySourceType = (items) => {
+  const filterBySourceType = useCallback((items) => {
     if (selectedSourceFilter === "all" || !selectedSourceFilter) return items;
     return items.filter((item) => item.source_type === selectedSourceFilter);
-  };
+  }, [selectedSourceFilter]);
 
-  const fetchDayCounts = async () => {
+  const fetchDayCounts = useCallback(async () => {
     try {
       const [todayRes, tomorrowRes, dayAfterRes] = await Promise.all([
         pickupApi.getByDate(getDateString(0)),
@@ -111,21 +113,21 @@ export default function SchedulePickup() {
     } catch {
       console.error("Failed to load pickup counts");
     }
-  };
+  }, [getDateString, filterBySourceId, filterBySourceType]);
   useEffect(() => {
     fetchDayCounts();
-  }, [selectedDepotFilter, selectedSourceFilter]);
+  }, [fetchDayCounts]);
 
   useEffect(() => {
     const urlDate = searchParams.get('date');
     if (urlDate && urlDate !== date) {
       setDate(urlDate);
     }
-  }, [searchParams]);
+  }, [searchParams, date]);
 
   useEffect(() => {
     setSearchParams({ date });
-  }, [date]);
+  }, [date, setSearchParams]);
 
   const getDateLabel = (offset) => {
     const d = new Date();
@@ -150,7 +152,7 @@ export default function SchedulePickup() {
     return `${day}, ${formatted}`;
   };
 
-  const fetchScheduledPickups = async () => {
+  const fetchScheduledPickups = useCallback(async () => {
     try {
       const res = await pickupApi.getByDate(date);
       const data = filterBySourceType(filterBySourceId(res.data || []));
@@ -160,22 +162,14 @@ export default function SchedulePickup() {
     } catch {
       toast.error("Failed to load scheduled pickups");
     }
-  };
+  }, [date, filterBySourceId, filterBySourceType]);
 
   useEffect(() => {
     fetchScheduledPickups();
-  }, [date, selectedDepotFilter, selectedSourceFilter]);
-
-  useEffect(() => {
-    fetchDayCounts();
-  }, [selectedDepotFilter]);
+  }, [fetchScheduledPickups]);
 
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
-
-  useEffect(() => {
-    setRows([createEmptyRow()]);
-  }, [currentUser?.role, currentUser?.transporter_id, currentUser?.transporter_name]);
 
   const getStatusClasses = (status) => {
     switch (status) {
@@ -271,7 +265,7 @@ export default function SchedulePickup() {
     );
   };
 
-  function createEmptyRow(sourceId = "", sourceName = "", sourceType = "Depot") {
+  const createEmptyRow = useCallback((sourceId = "", sourceName = "", rowSourceType = "Depot") => {
     return {
       truck_id: "",
       truck_number: "",
@@ -288,16 +282,45 @@ company_id: currentUser?.role === "Transporter" ? (mappedCompanyIds[0] || "") : 
 
       source_id: sourceId,
       source_name: sourceName,
-      source_type: sourceType,
+      source_type: rowSourceType,
 
       estimated_weight_mt: "",
       driver_phone: "",
     };
-  }
+  }, [currentUser?.role, currentUser?.transporter_id, currentUser?.transporter_name, companies, mappedCompanyIds]);
+
+  useEffect(() => {
+    setRows([createEmptyRow()]);
+  }, [createEmptyRow]);
+
+  const fetchData = useCallback(async () => {
+    const [truckRes, transporterRes, companyRes, depotRes] = await Promise.all([
+      trucksApi.getAll(),
+      transportersApi.getAll(),
+      sourcesApi.getAll('Company'),
+      sourcesApi.getAll('Depot')
+    ]);
+
+    setTrucks(truckRes.data || []);
+    setTransporters(transporterRes.data || []);
+    setCompanies(companyRes.data || []);
+    setDepots(depotRes.data || []);
+
+    if (currentUser?.role === "Transporter" && currentUser?.transporter_id) {
+      const transporterData = transporterRes.data?.find((t) => t.id === currentUser?.transporter_id);
+      if (transporterData?.company_ids?.length > 0) {
+        setRows((prevRows) => prevRows.map((row) => ({
+          ...row,
+          company_id: row.company_id || transporterData.company_ids[0],
+          company_name: row.company_name || (companyRes.data || []).find((company) => company.id === transporterData.company_ids[0])?.name || "",
+        })));
+      }
+    }
+  }, [currentUser?.role, currentUser?.transporter_id]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   useEffect(() => {
     if (currentUser?.role === "Transporter" && currentUser?.transporter_id) {
@@ -309,7 +332,7 @@ company_id: currentUser?.role === "Transporter" ? (mappedCompanyIds[0] || "") : 
         company_name: row.company_name || companies.find((company) => company.id === mappedCompanyIds[0])?.name || "",
       })));
     }
-  }, [currentUser?.role, currentUser?.transporter_id, currentUser?.transporter_name]);
+  }, [currentUser?.role, currentUser?.transporter_id, currentUser?.transporter_name, companies, mappedCompanyIds]);
 
   const handleFilterDepotChange = (depotId) => {
     setSelectedDepotFilter(depotId);
@@ -344,31 +367,6 @@ company_id: currentUser?.role === "Transporter" ? (mappedCompanyIds[0] || "") : 
       source_type: sourceType
     })));
   }, [sourceType]);
-
-  const fetchData = async () => {
-    const [truckRes, transporterRes, companyRes, depotRes] = await Promise.all([
-      trucksApi.getAll(),
-      transportersApi.getAll(),
-      sourcesApi.getAll('Company'),
-      sourcesApi.getAll('Depot')
-    ]);
-
-    setTrucks(truckRes.data || []);
-    setTransporters(transporterRes.data || []);
-    setCompanies(companyRes.data || []);
-    setDepots(depotRes.data || []);
-
-    if (currentUser?.role === "Transporter" && currentUser?.transporter_id) {
-      const transporterData = transporterRes.data?.find((t) => t.id === currentUser?.transporter_id);
-      if (transporterData?.company_ids?.length > 0) {
-        setRows((prevRows) => prevRows.map((row) => ({
-          ...row,
-          company_id: row.company_id || transporterData.company_ids[0],
-          company_name: row.company_name || (companyRes.data || []).find((company) => company.id === transporterData.company_ids[0])?.name || "",
-        })));
-      }
-    }
-  };
 
   // =============================
   // VEHICLE LOGIC (MATCH LIFTINGS)

@@ -90,7 +90,7 @@ export const VerifiedTruckDetailsDataTable = ({
     if (!selectedTruck) return;
     const updated = trucks.find(t => String(t.id) === String(selectedTruck.id));
     if (updated) setSelectedTruck(updated);
-  }, [trucks]);
+  }, [trucks, selectedTruck]);
 
   if (loading) {
     return (

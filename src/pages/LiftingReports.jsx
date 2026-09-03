@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -29,12 +29,7 @@ export default function LiftingReports() {
     lifting_type: ''
   });
 
-  useEffect(() => {
-    loadFilterOptions();
-    loadReport();
-  }, []);
-
-  const loadFilterOptions = async () => {
+  const loadFilterOptions = useCallback(async () => {
     try {
       const [productsRes, companiesRes, depotsRes] = await Promise.all([
         productsApi.getAll(),
@@ -47,9 +42,9 @@ export default function LiftingReports() {
     } catch (error) {
       console.error('Error loading filter options:', error);
     }
-  };
+  }, []);
 
-  const loadReport = async () => {
+  const loadReport = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
@@ -65,7 +60,12 @@ export default function LiftingReports() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    loadFilterOptions();
+    loadReport();
+  }, [loadFilterOptions, loadReport]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));

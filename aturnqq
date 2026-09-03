@@ -1,0 +1,46 @@
+[33mcommit 3393dd646afd2d33cf2a795be6ec8b7e606c9781[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: nischal <nischal@infoeight.com>
+Date:   Thu Aug 27 19:15:59 2026 +0530
+
+    phase 2 backend deployment
+
+[33mcommit bf42eaefe235bf1cc73b74e738ffe298ff2540a6[m
+Author: nischal <nischal@infoeight.com>
+Date:   Thu Aug 27 19:14:43 2026 +0530
+
+    phase 2 backend deployment
+
+[33mcommit 2cd86ce6dde417fffe8aaf92bf120d1a859628e3[m
+Author: nischal <nischal@infoeight.com>
+Date:   Thu Aug 27 19:10:18 2026 +0530
+
+    phase 2 backend deployment
+
+[33mcommit 2cd010e93ba21da9dccbb46fce3ec5e796b01a95[m
+Author: nischal <nischal@infoeight.com>
+Date:   Thu Aug 27 19:04:32 2026 +0530
+
+    fix(render): craco not found - include devDeps, legacy-peer-deps, CI=false build
+    
+    - move @craco/craco, workbox, tailwind, postcss, autoprefixer to dependencies so Render production install still gets craco (devDeps skipped with NODE_ENV=production)
+    - add .npmrc legacy-peer-deps=true for React 19 + react-scripts@5 peer conflicts
+    - add render.yaml with installCommand npm install --legacy-peer-deps --include=dev and buildCommand CI=false npm run build
+    - craco.config.js already forces CI=false to ignore warnings-as-errors
+
+[33mcommit c34b266e5d4b2260c1f405c846baab40f89e8138[m
+Author: nischal <nischal@infoeight.com>
+Date:   Thu Aug 27 18:59:02 2026 +0530
+
+    phase 2 backend deployment
+
+[33mcommit 7496c655fe352372785025ee2084c7fc3e3b5351[m
+Author: nischal <nischal@infoeight.com>
+Date:   Thu Aug 27 18:42:15 2026 +0530
+
+    phase frontend deplyement]
+
+[33mcommit 3be3fcd95a7e3fee1e677d44af785da442c9cce5[m
+Author: nischal <nischal@infoeight.com>
+Date:   Fri Jun 19 12:02:07 2026 +0530
+
+    code push

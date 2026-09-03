@@ -378,12 +378,6 @@ export default function Pickup() {
   const canView = hasPermission('Pickup (Execution)');
   const canExecute = hasActionPermission('execute_pickup');
 
-  const getDateString = (offset = 0) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offset);
-    return d.toISOString().split('T')[0];
-  };
-
   const formatDateWithDay = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString + 'T00:00:00');
@@ -391,12 +385,19 @@ export default function Pickup() {
     return date.toLocaleDateString('en-IN', options);
   };
 
-  const tabs = [
-    { key: 'yesterday', label: 'Yesterday', date: getDateString(-1) },
-    { key: 'today', label: 'Today', date: getDateString(0) },
-    { key: 'tomorrow', label: 'Tomorrow', date: getDateString(1) },
-    { key: 'day_after', label: 'Day After Tomorrow', date: getDateString(2) }
-  ];
+  const tabs = useMemo(() => {
+    const getDateStr = (offset = 0) => {
+      const d = new Date();
+      d.setDate(d.getDate() + offset);
+      return d.toISOString().split('T')[0];
+    };
+    return [
+      { key: 'yesterday', label: 'Yesterday', date: getDateStr(-1) },
+      { key: 'today', label: 'Today', date: getDateStr(0) },
+      { key: 'tomorrow', label: 'Tomorrow', date: getDateStr(1) },
+      { key: 'day_after', label: 'Day After Tomorrow', date: getDateStr(2) }
+    ];
+  }, []);
 
   const [activeTab, setActiveTab] = useState('today');
 

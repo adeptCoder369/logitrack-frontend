@@ -154,7 +154,7 @@ export default function VerifiedTruckDetails() {
   useEffect(() => {
     setTrucks(fetchedTrucks);
     setTotalPages(Math.ceil(fetchedTrucks.length / pageSize) || 1);
-  }, [fetchedTrucks]);
+  }, [fetchedTrucks, pageSize]);
 
   // When an invoice or shipping form is opened, prefill the corresponding form
   // with existing truck data if available so users see previous values when editing.

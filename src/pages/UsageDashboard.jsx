@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart3, Activity, Clock, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from 'sonner';
@@ -12,7 +12,7 @@ export default function UsageDashboard() {
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [summaryRes, logsRes] = await Promise.all([
@@ -26,9 +26,9 @@ export default function UsageDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [days]);
 
-  useEffect(() => { load(); }, [days]);
+  useEffect(() => { load(); }, [load]);
 
   const total = summary?.total_requests || 0;
   const byEndpoint = summary?.by_endpoint || {};

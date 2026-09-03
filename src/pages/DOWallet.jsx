@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageLayout } from '../components/layout/PageLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -30,11 +30,7 @@ export default function DOWallet() {
     dateTo: ''
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const apiCalls = [
         liftingsApi.getAll({ lifting_type: 'Primary' }),
@@ -59,7 +55,11 @@ export default function DOWallet() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [hasPermission]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Group liftings by delivery order and then by depot
   const getLiftingsByDO = (doId) => {

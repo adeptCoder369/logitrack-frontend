@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Plus, Search, Trash2, Eye, Send, Download, FileSpreadsheet, IndianRupee
 } from 'lucide-react';
@@ -35,7 +35,7 @@ export default function Invoices() {
   const [noteForm, setNoteForm] = useState({ type: 'credit', amount: '', reason: '' });
   const [actioning, setActioning] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await invoicesApi.getAll(statusFilter === 'all' ? undefined : statusFilter);
@@ -45,9 +45,9 @@ export default function Invoices() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
-  useEffect(() => { load(); }, [statusFilter]);
+  useEffect(() => { load(); }, [load]);
 
   const openGenerate = async () => {
     setGenerateOpen(true);

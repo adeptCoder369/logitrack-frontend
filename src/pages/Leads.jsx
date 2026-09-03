@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   TrendingUp,
   Plus,
@@ -50,7 +50,7 @@ export default function Leads() {
   const [saving, setSaving] = useState(false);
   const [converting, setConverting] = useState(null);
 
-  const loadLeads = async () => {
+  const loadLeads = useCallback(async () => {
     try {
       const res = await leadsApi.getAll(statusFilter === 'all' ? {} : { status: statusFilter });
       setLeads(res.data || []);
@@ -59,11 +59,11 @@ export default function Leads() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   useEffect(() => {
     loadLeads();
-  }, [statusFilter]);
+  }, [loadLeads]);
 
   useEffect(() => {
     (async () => {

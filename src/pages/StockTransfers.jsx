@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ArrowRightLeft, Plus, Search, Eye, Send, CheckCircle, XCircle, Truck, Package, Clock, FileSpreadsheet, Settings } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -46,7 +46,7 @@ function TransfersTab() {
   const [detail, setDetail] = useState(null);
   const [actionNotes, setActionNotes] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await stockTransfersApi.getAll(statusFilter === 'all' ? {} : { status: statusFilter });
@@ -56,9 +56,9 @@ function TransfersTab() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
-  useEffect(() => { load(); }, [statusFilter]);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     (async () => {
@@ -327,7 +327,7 @@ function ApprovalTab() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [mRes, pRes] = await Promise.all([approvalMatricesApi.getAll(), productsApi.getAll()]);
       setMatrices(mRes.data || []);
@@ -335,8 +335,8 @@ function ApprovalTab() {
     } catch {
       toast.error('Failed to load approval matrices');
     }
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
